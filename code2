@@ -1,0 +1,95 @@
+package com.xyz.MORNETPlus.services.hilointerface;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.voltage.securedata.enterprise.FPE;
+
+/**
+ * HPVoltageEncryptionUtility.java - a simple class to encrypt SSN using Voltage
+ * Simple API.
+ */
+public class HPVoltageEncryptionUtility {
+
+	private static final String YES = "Y";
+	private static HPVoltageEncryptionUtility instance = null;
+
+	private static final Log logger = LogFactory.getLog(HPVoltageEncryptionUtility.class);
+
+	private FPE fpe = null;
+
+	public HPVoltageEncryptionUtility() {
+
+	}
+
+	public void resetFPEHandler() {
+		createFPEHandler();
+	}
+
+	private void createFPEHandler() {
+		try {
+			fpe = HPVoltageEncryptServiceConfig.buildFPE();
+		} catch (Exception e) {
+			logger.error(e.getMessage());
+		}
+	}
+
+	/**
+	 * Encrypt plain with HP Voltage Simple API. The method returns list of
+	 * encrypted SSNs with all HP Voltage keys. Encrypted SSN with current key
+	 * is the first value in the list returned.
+	 *
+	 * @param plainSSN
+	 *            the SSN to be encrypted
+	 * @return list of encrypted SSN with all HP Voltage keys with encrypted SSN
+	 *         with current key being the first value.
+	 * @throws EncryptionException
+	 * @throws Exception
+	 */
+	public List<String> encryptWithSimpleAPI(String plainSSN) throws EncryptionException {
+		
+		List<String> encryptedValues = new ArrayList<String>();
+		//Return unencrypted value if the HP voltage is turned off
+		if(!YES.equalsIgnoreCase(HPVoltageEncryptServiceConfig.getEncryptFlag())) {
+			logger.warn("Proceeding without encryption");
+			encryptedValues.add(plainSSN);
+			return encryptedValues;
+		} else {
+
+			// Load the JNI library
+			try {
+				if(fpe != null) {
+					//Get all key numbers and encrypt using them
+					int[] keyNumbers = fpe.getKeyNumbers();
+					if (keyNumbers != null) {
+						//Get current key number as it should be the first in the list of encrypted values
+						int currentKeyNumber = fpe.getCurrentKeyNumber();
+						String currentEncryptedValue = fpe.protectWithKeyNumber(plainSSN, currentKeyNumber);
+						encryptedValues.add(currentEncryptedValue);
+						String encryptedValue = "";
+						int numOfKeys = keyNumbers.length;
+						if (numOfKeys > 1) {
+							logger.info("Number of keys for encryption:" + numOfKeys);
+						}
+						for (int i = 0; i < numOfKeys; i++) {
+							if (keyNumbers[i] != currentKeyNumber) {
+								encryptedValue = fpe.protectWithKeyNumber(plainSSN, keyNumbers[i]);
+								encryptedValues.add(encryptedValue);
+							}
+						}
+						logger.info("Successfully encrypted input SSN");
+					}
+				}
+			} catch (Exception e) {
+				logger.error("Exception occured while encrypting SSN", e);
+				throw new EncryptionException(e.getMessage());
+			}
+		}
+
+		return encryptedValues;
+	}
+}
+
