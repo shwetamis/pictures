@@ -1,0 +1,139 @@
+package xyz.MORNETPlus.services.hilointerface;
+/*SFORGAUT03-5413
+ * SSN encryption for HiLo in KB
+ * : HPVoltageEncryptServiceConfig: for all the voltage configuration and connections
+ */
+
+import java.util.Properties;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.xyz.MORNETPlus.services.util.authprovider.AuthProvider;
+import com.voltage.securedata.enterprise.FPE;
+import com.voltage.securedata.enterprise.LibraryContext;
+
+
+public class HPVoltageEncryptServiceConfig{
+
+
+	private static final Log logger = LogFactory.getLog( HPVoltageEncryptServiceConfig.class );
+	
+	private static final String POLICY_URL = "hpVolt.policyURL";
+	private static final String IDENTITY = "hpvolt.identity";
+	private static final String FORMAT = "hpvolt.format";
+	private static final String TRUST_STORE_PATH = "hpvolt.trustStorePath";
+	private static final String HP_VOLT_VERSION = "hpvolt.version";
+	private static final String HP_VOLT_API = "hpvolt.simpleAPI";
+	private static final String HP_VOLT_ENCRYPT = "hpVolt.encrypt";
+	private static final String HP_VOLT_DECRYPT = "hpVolt.decrypt";
+	private static final String HP_VOLT_LIB = "hpVolt.library";
+	
+	private static final String SIMPLEAPI_ENCRYPTIONSERVICE_CONFIG_FILE = "EncryptionService.properties";
+	public static final String YES = "Y";
+	public static final String NO = "N";
+	
+
+	private static String policyURL;
+	private static String identity;
+	private static String format;
+	private static String trustStorePath;
+	private static String hpVoltVersion;
+	private static String simpleAPI;
+	private static String encryptFlag;
+	private static String hpVoltageLib;
+	private static String decryptFlag;
+	
+	int[] keyNumbers = null;
+
+	int currentKeyNumber;
+
+	private static LibraryContext library;
+
+	public static LibraryContext getLibrary() throws Exception {
+		if(library == null){
+			loadLibrary();
+		}
+		return library;
+	}
+	public static void loadLibrary() throws Exception {
+		System.loadLibrary(hpVoltageLib);
+		// Create LibraryContext object LibraryContext class provides the overall
+		// context within which the cryptographic operations of the Simple API take place.
+		library = new LibraryContext.Builder().setPolicyURL(policyURL).setTrustStorePath(trustStorePath)
+		.setClientIdProduct(simpleAPI, hpVoltVersion).build();
+
+	}
+	//Private constructor to prevent direct instantiation
+		private static void loadSimpleAPIEncryptServiceConfig() {
+			Properties prop = new Properties();
+			try {
+//				logger.info("Loading Encryption properties " + configFile);
+				prop.load(HPVoltageEncryptServiceConfig.class.getClassLoader().getResourceAsStream(SIMPLEAPI_ENCRYPTIONSERVICE_CONFIG_FILE));
+				encryptFlag = prop.getProperty(HP_VOLT_ENCRYPT);
+				policyURL = prop.getProperty(POLICY_URL);
+				identity = prop.getProperty(IDENTITY);
+				format = prop.getProperty(FORMAT);
+				trustStorePath = prop.getProperty(TRUST_STORE_PATH);
+				hpVoltVersion = prop.getProperty(HP_VOLT_VERSION);
+				simpleAPI = prop.getProperty(HP_VOLT_API);
+				hpVoltageLib = prop.getProperty(HP_VOLT_LIB);
+				if(YES.equals(encryptFlag)) {
+					loadLibrary();
+				}
+
+			} catch (Exception ex) {
+				logger.error("HPVoltageEncryption: Unable to load properties file :" + SIMPLEAPI_ENCRYPTIONSERVICE_CONFIG_FILE, ex);
+				encryptFlag = NO;
+				logger.warn("Explicitly setting the encryption flag to N");
+			}
+	    }
+
+
+		public static String getEncryptFlag() {
+			return encryptFlag;
+		}
+
+
+
+		public static String getTrustStorePath() {
+			return trustStorePath;
+		}
+
+		public String getSimpleAPI() {
+			return simpleAPI;
+		}
+
+		public static Log getLogger() {
+			return logger;
+		}
+
+		public static String getSimpleApi() {
+			return simpleAPI;
+		}
+
+		public static String getPolicyURL() {
+			return policyURL;
+		}
+
+		public String getIdentity() {
+			return identity;
+		}
+
+		public static FPE buildFPE() throws Exception{
+			FPE fpe = null;
+			AuthProvider authProvider = null;
+			if(!YES.equals(encryptFlag)) {
+				if (getLibrary() != null) {
+					fpe = getLibrary().getFPEBuilder(format).setUsernamePassword(
+							authProvider.getUserId(),
+							authProvider.getPassword()).setIdentity(identity).build();
+					logger.info("FPE initilized");
+				}
+			}
+
+			return fpe;
+		}
+
+
+}
